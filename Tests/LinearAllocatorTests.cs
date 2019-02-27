@@ -9,32 +9,56 @@ using AllocatorsDotNet;
 using AllocatorsDotNet.Unmanaged;
 using Xunit;
 using Xunit.Sdk;
+using Shouldly;
+using static Shouldly.ShouldThrowExtensions;
 
 namespace Tests
 {
     public class LinearAllocatorTests
     {
         [Fact]
-        public void TestDispose()
+        public void Disposal_CallsPinPostDispose_AssertThrowsObjDisposedEx()
         {
             var allocator = new LinearAllocator<byte>();
+
             allocator.Dispose();
-            Assert.Throws<ObjectDisposedException>(() => allocator.GetSpan());
-            Assert.Throws<ObjectDisposedException>(() => allocator.Unpin());
+
             Assert.Throws<ObjectDisposedException>(() => allocator.Pin());
         }
 
         [Fact]
-        public void TestDupDispose()
+        public void Disposal_CallsUnpinPostDispose_AssertThrowsObjDisposedEx()
         {
             var allocator = new LinearAllocator<byte>();
+
+            allocator.Dispose();
+
+            Assert.Throws<ObjectDisposedException>(() => allocator.Unpin());
+        }
+
+        [Fact]
+        public void Disposal_CallsGetSpanPostDispose_AssertThrowsObjDisposedEx()
+        {
+            var allocator = new LinearAllocator<byte>();
+
+            allocator.Dispose();
+
+            Assert.Throws<ObjectDisposedException>(() => allocator.GetSpan());
+
+        }
+
+        [Fact]
+        public void Disposal_CallDisposePostDispose_Expected()
+        {
+            var allocator = new LinearAllocator<byte>();
+
             allocator.Dispose();
             allocator.Dispose();
             allocator.Dispose();
         }
 
         [Fact]
-        public void TestGetSpanLegalIndices()
+        public void GetSpan_WritesLegalIndices_Expected()
         {
             using (var allocator = new LinearAllocator<byte>(1024))
             {
@@ -57,13 +81,13 @@ namespace Tests
         }
 
         [Fact]
-        public void TestGetSpanIllegalIndices()
+        public void GetSpan_WritesIllegalIndices_AssertThrowsOutOfRangeEx()
         {
             Assert.Throws<IndexOutOfRangeException>(InternalTestGetSpanIllegalIndices);
         }
 
         [Fact]
-        public void TestMemoryPreservation()
+        public void GetSpan_ReadsWritesLegalChecksMemPreservation_Expected()
         {
             using (var allocator = new LinearAllocator<byte>(1024))
             {
@@ -90,7 +114,7 @@ namespace Tests
         }
 
         [Fact]
-        public void TestRead()
+        public void Permissions_ReadsLegal_Expected()
         {
             using (var allocator = new LinearAllocator<byte>(AllocFlags.Read, 1024))
             {
@@ -99,7 +123,7 @@ namespace Tests
         }
 
         [Fact]
-        public void TestWrite()
+        public void Permissions_WritesLegal_Expected()
         {
             using (var allocator = new LinearAllocator<byte>(AllocFlags.Write | AllocFlags.Read, 1024))
             {
@@ -108,7 +132,7 @@ namespace Tests
         }
 
         [Fact]
-        public void TestExe()
+        public void Permissions_ExecutesLegal_Expected()
         {
             using (var allocator = new LinearAllocator<byte>(AllocFlags.Execute, 1024))
             {
@@ -117,7 +141,7 @@ namespace Tests
         }
 
         [Fact]
-        public void TestReadWrite()
+        public void Permissions_ReadsWritesLegal_Expected()
         {
             using (var allocator = new LinearAllocator<byte>(AllocFlags.Read | AllocFlags.Write, 1024))
             {
@@ -127,7 +151,7 @@ namespace Tests
         }
 
         [Fact]
-        public void TestReadExe()
+        public void Permissions_ReadsExecutesLegal_Expected()
         {
             using (var allocator = new LinearAllocator<byte>(AllocFlags.Read | AllocFlags.Execute, 1024))
             {
@@ -137,7 +161,7 @@ namespace Tests
         }
 
         [Fact]
-        public void TestReadWriteExe()
+        public void Permissions_ReadsWritesExecutesLegal_Expected()
         {
             using (var allocator = new LinearAllocator<byte>(AllocFlags.Read | AllocFlags.Write | AllocFlags.Execute, 1024))
             {
