@@ -1,4 +1,4 @@
-﻿namespace Allocators.Win32.Handles
+﻿namespace AllocatorsDotNet.Win32.Handles
 {
     public unsafe class SafeHeapAllocHandle : SafeMemoryHandle
     {

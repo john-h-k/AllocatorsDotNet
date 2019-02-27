@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Buffers;
 using System.Threading;
-using Allocators.Win32;
-using Allocators.Win32.Handles;
+using AllocatorsDotNet.Win32;
+using AllocatorsDotNet.Win32.Handles;
 
-namespace Allocators.Unmanaged
+namespace AllocatorsDotNet.Unmanaged
 {
     public unsafe class LinearAllocator<T> : MemoryManager<T> where T : unmanaged
     {

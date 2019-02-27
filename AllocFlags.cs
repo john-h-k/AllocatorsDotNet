@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Allocators.Win32;
-using static Allocators.Win32.NativeEnums;
+using AllocatorsDotNet.Win32;
 
-namespace Allocators
+namespace AllocatorsDotNet
 {
     [Flags]
     public enum AllocFlags : uint
@@ -17,34 +14,44 @@ namespace Allocators
 
     internal static class AllocFlagExtensions
     {
-        // For efficient translation
+        // For easiness to read
         internal const AllocFlags ReadWrite = AllocFlags.Read | AllocFlags.Write;
         internal const AllocFlags ReadWriteExe = AllocFlags.Read | AllocFlags.Write | AllocFlags.Execute;
         internal const AllocFlags ReadExe = AllocFlags.Read | AllocFlags.Execute;
 
-        public static ProtectionTypes TranslateToWin32(this AllocFlags flags)
+        public static NativeEnums.ProtectionTypes TranslateToWin32(this AllocFlags flags)
         {
             switch (flags)
             {
-                case AllocFlags.None:
-                    return ProtectionTypes.PAGE_NOACCESS;
-                case AllocFlags.Read:
-                    return ProtectionTypes.PAGE_READONLY;
-                case AllocFlags.Write:
-                    throw new ArgumentException("Cannot have write-only memory");
-                case AllocFlags.Execute:
-                    return ProtectionTypes.PAGE_READWRITE;
+                // Normal cases
 
+                case AllocFlags.None:
+                    return NativeEnums.ProtectionTypes.PAGE_NOACCESS;
+                case AllocFlags.Read:
+                    return NativeEnums.ProtectionTypes.PAGE_READONLY;
+                case AllocFlags.Execute:
+                    return NativeEnums.ProtectionTypes.PAGE_READWRITE;
                 case ReadWrite:
-                    return ProtectionTypes.PAGE_READWRITE;
+                    return NativeEnums.ProtectionTypes.PAGE_READWRITE;
                 case ReadExe:
-                    return ProtectionTypes.PAGE_EXECUTE_READ;
+                    return NativeEnums.ProtectionTypes.PAGE_EXECUTE_READ;
                 case ReadWriteExe:
-                    return ProtectionTypes.PAGE_EXECUTE_READWRITE;
+                    return NativeEnums.ProtectionTypes.PAGE_EXECUTE_READWRITE;
+
+                // Exceptional cases
+
+                case AllocFlags.Write:
+                    ThrowHelper.ThrowArgEx("Cannot have write only memory");
+                    break;
+                case AllocFlags.Write | AllocFlags.Execute:
+                    ThrowHelper.ThrowArgEx("Cannot have write + execute only memory");
+                    break;
+                default:
+                    ThrowHelper.ThrowArgEx("Unrecognised enum value");
+                    break;
             }
 
-            ThrowHelper.ThrowArgEx("Invalid flag combination");
-            return default; // unreachable but necessary
+            return default;
         }
     }
 }

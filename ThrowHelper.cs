@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Allocators
+namespace AllocatorsDotNet
 {
     public static class ThrowHelper
     {

@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
-using Allocators.Win32.Handles;
-using static Allocators.Win32.NativeEnums;
+using AllocatorsDotNet.Win32.Handles;
+
 // ReSharper disable InconsistentNaming
 
-namespace Allocators.Win32
+namespace AllocatorsDotNet.Win32
 {
     internal static unsafe class UnsafeNativeMethods
     {
@@ -15,26 +15,26 @@ namespace Allocators.Win32
 
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
         [DllImport("kernel32", EntryPoint = "HeapAlloc", ExactSpelling = true, SetLastError = true)]
-        public static extern void* HeapAlloc(IntPtr heapHandle, HeapAllocFlags flags, IntPtr size);
+        public static extern void* HeapAlloc(IntPtr heapHandle, NativeEnums.HeapAllocFlags flags, IntPtr size);
 
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
         [DllImport("kernel32", EntryPoint = "HeapFree", ExactSpelling = true, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool HeapFree(IntPtr heapHandle, HeapAllocFlags flags, void* mem);
+        public static extern bool HeapFree(IntPtr heapHandle, NativeEnums.HeapAllocFlags flags, void* mem);
 
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
         [DllImport("kernel32", EntryPoint = "VirtualAlloc", ExactSpelling = true, SetLastError = true)]
-        public static extern IntPtr VirtualAlloc(IntPtr address, IntPtr size, MemAllocTypeFlags allocationType, ProtectionTypes protectionFlags);
+        public static extern IntPtr VirtualAlloc(IntPtr address, IntPtr size, NativeEnums.MemAllocTypeFlags allocationType, NativeEnums.ProtectionTypes protectionFlags);
 
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
         [DllImport("kernel32", EntryPoint = "VirtualFree", ExactSpelling = true, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool VirtualFree(IntPtr address, IntPtr size, MemFreeTypeFlags freeType);
+        public static extern bool VirtualFree(IntPtr address, IntPtr size, NativeEnums.MemFreeTypeFlags freeType);
 
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
         [DllImport("kernel32", EntryPoint = "VirtualProtect", ExactSpelling = true, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool VirtualProtect(IntPtr address, IntPtr size, ProtectionTypes newProtectionFlags, ProtectionTypes* oldProtectionFlags);
+        public static extern bool VirtualProtect(IntPtr address, IntPtr size, NativeEnums.ProtectionTypes newProtectionFlags, NativeEnums.ProtectionTypes* oldProtectionFlags);
 
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
         [DllImport("kernel32", EntryPoint = "GetProcessHeap", ExactSpelling = true, SetLastError = true)]
@@ -48,7 +48,7 @@ namespace Allocators.Win32
     internal static unsafe class NativeMethods
     {
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
-        public static void* HeapAlloc(IntPtr size, HeapAllocFlags flags = 0,
+        public static void* HeapAlloc(IntPtr size, NativeEnums.HeapAllocFlags flags = 0,
             IntPtr heap = default)
         {
             if (heap == default)
@@ -58,14 +58,16 @@ namespace Allocators.Win32
         }
 
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
-        public static bool HeapFree(void* mem, HeapAllocFlags flags = 0, IntPtr heap = default)
+        public static bool HeapFree(void* mem, NativeEnums.HeapAllocFlags flags = 0, IntPtr heap = default)
         {
             if (heap == default)
                 heap = UnsafeNativeMethods.ProcessHeapHandle;
 
             return UnsafeNativeMethods.HeapFree(heap, flags, mem);
         }
-        
+
+
+        private static readonly int PageSize = Environment.SystemPageSize;
         public static SafeMemoryHandle Alloc(AllocFlags flags, IntPtr size)
         {
             if (flags == AllocFlagExtensions.ReadWrite)
@@ -76,7 +78,18 @@ namespace Allocators.Win32
             else
             {
                 // need to VirtualAlloc() an entire page with the permissions
-                return new SafePageHandle((void*)UnsafeNativeMethods.VirtualAlloc(IntPtr.Zero, IntPtr.Zero, MemAllocTypeFlags.MEM_COMMIT | MemAllocTypeFlags.MEM_RESERVE, flags.TranslateToWin32()));
+                NativeEnums.ProtectionTypes protectionFlags = flags.TranslateToWin32();
+                var handle = new SafePageHandle(
+                    (void*)UnsafeNativeMethods.VirtualAlloc(
+                        IntPtr.Zero, 
+                        (IntPtr)PageSize, 
+                        NativeEnums.MemAllocTypeFlags.MEM_COMMIT | NativeEnums.MemAllocTypeFlags.MEM_RESERVE, 
+                        protectionFlags));
+
+                if (handle.IsInvalid)
+                    throw new InvalidOperationException($"Allocation failed, with HRESULT {UnsafeNativeMethods.GetLastError():X8}");
+
+                return handle;
             }
         }
     }

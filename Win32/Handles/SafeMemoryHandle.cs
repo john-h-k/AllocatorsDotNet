@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
-namespace Allocators.Win32.Handles
+namespace AllocatorsDotNet.Win32.Handles
 {
     public abstract unsafe class SafeMemoryHandle : SafeHandle
     {
