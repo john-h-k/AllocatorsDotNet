@@ -30,7 +30,7 @@ namespace AllocatorsDotNet
                 case AllocFlags.Read:
                     return NativeEnums.ProtectionTypes.PAGE_READONLY;
                 case AllocFlags.Execute:
-                    return NativeEnums.ProtectionTypes.PAGE_READWRITE;
+                    return NativeEnums.ProtectionTypes.PAGE_EXECUTE;
                 case ReadWrite:
                     return NativeEnums.ProtectionTypes.PAGE_READWRITE;
                 case ReadExe:

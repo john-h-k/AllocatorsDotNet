@@ -8,9 +8,6 @@ using System.Threading;
 using AllocatorsDotNet;
 using AllocatorsDotNet.Unmanaged;
 using Xunit;
-using Xunit.Sdk;
-using Shouldly;
-using static Shouldly.ShouldThrowExtensions;
 
 namespace Tests
 {
@@ -134,7 +131,7 @@ namespace Tests
         [Fact]
         public void Permissions_ExecutesLegal_Expected()
         {
-            using (var allocator = new LinearAllocator<byte>(AllocFlags.Execute, 1024))
+            using (var allocator = new LinearAllocator<byte>(AllocFlags.Execute))
             {
                 InternalTestExe(allocator);
             }
@@ -150,10 +147,26 @@ namespace Tests
             }
         }
 
+        private Span<byte> GetReturns2MachineCode()
+        {
+            Architecture arch = RuntimeInformation.ProcessArchitecture;
+
+            if (arch == Architecture.X64 || arch == Architecture.X86)
+            {
+                return new byte[] { 0xB8, 0x02, 0x00, 0x00, 0x00, 0xC3 }; // mov eax, 2 then ret
+            }
+            else
+            {
+                throw new NotImplementedException("TODO: Implement for ARM and ARM64");
+            }
+        }
+
         [Fact]
         public void Permissions_ReadsExecutesLegal_Expected()
         {
-            using (var allocator = new LinearAllocator<byte>(AllocFlags.Read | AllocFlags.Execute, 1024))
+            Span<byte> data = GetReturns2MachineCode();
+
+            using (LinearAllocator<byte> allocator = WriteSpanAndChangeProtection(data, AllocFlags.Read | AllocFlags.Execute))
             {
                 InternalTestRead(allocator);
                 InternalTestExe(allocator);
@@ -188,9 +201,41 @@ namespace Tests
             }
         }
 
-        private static void InternalTestExe(LinearAllocator<byte> allocator)
+        private static LinearAllocator<byte> WriteSpanAndChangeProtection(Span<byte> sourceSpan, AllocFlags newFlags)
         {
-            // TODO
+            using (var allocator = new LinearAllocator<byte>())
+            {
+                Span<byte> span = allocator.GetSpan();
+
+                sourceSpan.CopyTo(span);
+
+                return new LinearAllocator<byte>(allocator, newFlags);
+            }
+        }
+
+        private delegate int RetInt();
+        private unsafe void InternalTestExe(LinearAllocator<byte> allocator)
+        {
+            AllocFlags flags = allocator.AllocFlags;
+
+            var success = false;
+            allocator.DangerousChangeProtection(ref success, AllocFlags.Read | AllocFlags.Write);
+            Span<byte> span = allocator.GetSpan();
+            GetReturns2MachineCode().CopyTo(span);
+            Assert.True(success);
+
+            success = false;
+            allocator.DangerousChangeProtection(ref success, flags);
+            Assert.True(success);
+
+            RetInt del;
+
+            fixed (byte* bPtr = span)
+            {
+                del = Marshal.GetDelegateForFunctionPointer<RetInt>((IntPtr)bPtr);
+            }
+
+            Assert.True(del() == 2);
         }
     }
 }

@@ -40,6 +40,10 @@ namespace AllocatorsDotNet.Win32
         [DllImport("kernel32", EntryPoint = "GetProcessHeap", ExactSpelling = true, SetLastError = true)]
         public static extern IntPtr GetProcessHeap();
 
+        [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
+        [DllImport("kernel32", EntryPoint = "VirtualQuery", ExactSpelling = true, SetLastError = true)]
+        public static extern IntPtr VirtualQuery(void* address, MemInfo* pMemInfo, IntPtr size);
+
         // For consistency in naming and location
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
         public static int GetLastError() => Marshal.GetLastWin32Error();
@@ -70,28 +74,31 @@ namespace AllocatorsDotNet.Win32
         private static readonly int PageSize = Environment.SystemPageSize;
         public static SafeMemoryHandle Alloc(AllocFlags flags, IntPtr size)
         {
-            if (flags == AllocFlagExtensions.ReadWrite)
-            {
-                // yay! can use HeapAlloc(), keep life easy
-                return new SafeHeapAllocHandle(HeapAlloc(size), ownsHandle: true);
-            }
-            else
-            {
-                // need to VirtualAlloc() an entire page with the permissions
-                NativeEnums.ProtectionTypes protectionFlags = flags.TranslateToWin32();
-                var handle = new SafePageHandle(
-                    (void*)UnsafeNativeMethods.VirtualAlloc(
-                        IntPtr.Zero, 
-                        (IntPtr)PageSize, 
-                        NativeEnums.MemAllocTypeFlags.MEM_COMMIT | NativeEnums.MemAllocTypeFlags.MEM_RESERVE, 
-                        protectionFlags));
+            // need to VirtualAlloc() an entire page with the permissions
+            NativeEnums.ProtectionTypes protectionFlags = flags.TranslateToWin32();
+            var handle = new SafePageHandle(
+                (void*)UnsafeNativeMethods.VirtualAlloc(
+                    IntPtr.Zero,
+                    (IntPtr)PageSize,
+                    NativeEnums.MemAllocTypeFlags.MEM_COMMIT | NativeEnums.MemAllocTypeFlags.MEM_RESERVE,
+                    protectionFlags));
 
-                if (handle.IsInvalid)
-                    throw new InvalidOperationException($"Allocation failed, with HRESULT {UnsafeNativeMethods.GetLastError():X8}");
+            if (handle.IsInvalid)
+                throw new InvalidOperationException($"Allocation failed, with HRESULT {UnsafeNativeMethods.GetLastError():X8}");
 
-                return handle;
-            }
+            return handle;
         }
+    }
+
+    internal unsafe struct MemInfo
+    {
+        void* BaseAddress;
+        void* AllocationBase;
+        uint AllocationProtect;
+        IntPtr RegionSize;
+        uint State;
+        uint Protect;
+        uint Type;
     }
 
     internal static class NativeEnums
