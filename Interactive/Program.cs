@@ -10,7 +10,6 @@ namespace Interactive
         private static void Main(string[] args)
         {
             var allocator = new LinearAllocator<byte>(1024);
-
             IMemoryOwner<byte> block = allocator.Rent(512);
             Span<byte> span = block.Memory.Span;
             for (var i = 0; i < span.Length; i++)
