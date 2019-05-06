@@ -38,6 +38,7 @@ namespace AllocatorsDotNet.Unmanaged
 
         public override IMemoryOwner<T> Rent(int minBufferSize = -1)
         {
+            ThrowIfDisposed();
             if (minBufferSize == -1) minBufferSize = AllocSize;
             int length = minBufferSize * sizeof(T);
             if (length + _nextStart > _length)
@@ -83,11 +84,13 @@ namespace AllocatorsDotNet.Unmanaged
 
             public override Span<T> GetSpan()
             {
+                ThrowIfDisposed();
                 return new Span<T>((void*)(_block.DangerousGetHandle() + _start), _length);
             }
 
             public override MemoryHandle Pin(int elementIndex = 0)
             {
+                ThrowIfDisposed();
                 var success = false;
                 do
                 {
@@ -99,6 +102,7 @@ namespace AllocatorsDotNet.Unmanaged
 
             public override void Unpin()
             {
+                ThrowIfDisposed();
                 _block.DangerousRelease();
             }
         }
