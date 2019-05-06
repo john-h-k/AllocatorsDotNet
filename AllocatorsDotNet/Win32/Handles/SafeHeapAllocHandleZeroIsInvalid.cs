@@ -1,6 +1,6 @@
 ﻿namespace AllocatorsDotNet.Win32.Handles
 {
-    public unsafe class SafeHeapAllocHandle : SafeMemoryHandle
+    public unsafe class SafeHeapAllocHandle : SafeHandleZeroIsInvalid
     {
         public SafeHeapAllocHandle(bool ownsHandle) : base(ownsHandle)
         {

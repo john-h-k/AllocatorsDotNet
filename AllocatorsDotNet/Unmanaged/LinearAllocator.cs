@@ -1,132 +1,106 @@
 ﻿using System;
 using System.Buffers;
 using System.Threading;
+using AllocatorsDotNet.PAL;
 using AllocatorsDotNet.Win32;
 using AllocatorsDotNet.Win32.Handles;
 
 namespace AllocatorsDotNet.Unmanaged
 {
-    public unsafe class LinearAllocator<T> : MemoryManager<T> where T : unmanaged
+    public unsafe class LinearAllocator<T> : MemoryPool<T> where T : unmanaged
     {
-        private SafeMemoryHandle _start;
-        private int _length;
-        private int _pinCount;
+        private readonly SafeHandleZeroIsInvalid _start;
+        private readonly int _length;
+        private int _nextStart;
         private bool _disposed;
-        private AllocFlags _allocFlags;
 
-        public AllocFlags AllocFlags => _allocFlags;
+
 
         // ReSharper disable once StaticMemberInGenericType
-        private const int AllocSize = 1024;
-
-        public LinearAllocator(int size) : this(AllocFlags.Read | AllocFlags.Write, size) { }
+        private static readonly int AllocSize = Allocation.PageSize;
+        public LinearAllocator(int size, AllocFlags flags = AllocFlags.Read | AllocFlags.Write)
+        {
+            _start = Allocation.Alloc(flags, (IntPtr)size);
+            _length = size;
+        }
 
         internal static bool HandleEquals(LinearAllocator<T> left, LinearAllocator<T> right)
             => left._start.DangerousGetHandle() == right._start.DangerousGetHandle();
-
-        internal MemInfo GetCurrentMemInfo()
-        {
-            MemInfo info;
-            UnsafeNativeMethods.VirtualQuery((void*)_start.DangerousGetHandle(), &info, (IntPtr)sizeof(MemInfo));
-            return info;
-        }
-
-        public void DangerousChangeProtection(ref bool success, AllocFlags newFlags)
-        {
-            if (success)
-                ThrowHelper.ThrowArgEx("ref bool must be initialized to false");
-
-            NativeEnums.ProtectionTypes dummy;
-
-            success = UnsafeNativeMethods.VirtualProtect(
-                _start.DangerousGetHandle(),
-                (IntPtr) _length, newFlags.TranslateToWin32(),
-                &dummy);
-        }
-
-        public LinearAllocator(AllocFlags flags = AllocFlags.Read | AllocFlags.Write, int size = AllocSize)
-        {
-            _start = NativeMethods.Alloc(flags, (IntPtr)size);
-            _length = size;
-            _allocFlags = flags;
-        }
-
-        public LinearAllocator(LinearAllocator<T> other, AllocFlags? changeFlags = null)
-        {
-            _start = other._start;
-            _length = other._length;
-
-            if (changeFlags is null)
-            {
-                _allocFlags = other._allocFlags;
-            }
-            else
-            {
-                NativeEnums.ProtectionTypes dummy;
-
-                bool result = UnsafeNativeMethods.VirtualProtect(other._start.DangerousGetHandle(), (IntPtr)other._length,
-                    changeFlags.Value.TranslateToWin32(), &dummy);
-
-                if (!result)
-                    throw new Exception("Unexpected failure"); // TODO
-
-                _allocFlags = changeFlags.Value;
-            }
-        }
 
         protected override void Dispose(bool disposing)
         {
             if (_disposed) return;
 
-            // We don't dispose of the handle in case other managers are pointing to it
-            // the GC recognises when it needs to be finalized
+            _start.Dispose();
 
             _disposed = true;
         }
 
-        public void Dispose() => ((IDisposable)this).Dispose();
+        public override IMemoryOwner<T> Rent(int minBufferSize = -1)
+        {
+            if (minBufferSize == -1) minBufferSize = AllocSize;
+            int length = minBufferSize * sizeof(T);
+            if (length + _nextStart > _length)
+                ThrowHelper.ThrowInsufficientMemoryException($"Required {length} bytes, but buffer could only provide {_length - _nextStart}");
 
-        private void ThrowDisposed()
+            var block = new BlockManager(_start, _nextStart, length);
+            _nextStart += length;
+            return block;
+        }
+
+        public override int MaxBufferSize { get; } = int.MaxValue; // TODO
+
+        private void ThrowIfDisposed()
         {
             if (_disposed)
-                ThrowHelper.ThrowDisposed();
+                ThrowHelper.ThrowObjectDisposedException();
         }
 
-        public override Span<T> GetSpan() // unsafe method
+        private class BlockManager : MemoryManager<T>
         {
-            ThrowDisposed();
+            private readonly SafeHandleZeroIsInvalid _block;
+            private readonly int _start;
+            private readonly int _length;
 
-            if (_start.IsInvalid || _length == 0)
-                throw new InvalidOperationException("Buffer doesn't exist");
-
-            return new Span<T>(_start.DangerousGetHandle().ToPointer(), _length);
-        }
-
-        public override MemoryHandle Pin(int elementIndex = 0)
-        {
-            ThrowDisposed();
-
-            var success = false;
-            do
+            public BlockManager(SafeHandleZeroIsInvalid handle, int start, int length)
             {
-                _start.DangerousAddRef(ref success);
-                // DEADLOCK TODO
+                _block = handle;
+                _start = start;
+                _length = length;
+            }
 
-            } while (!success);
+            private bool _disposed = false;
+            protected override void Dispose(bool disposing)
+            {
+                _disposed = true;
+            }
 
-            Interlocked.Increment(ref _pinCount);
-            return new MemoryHandle((_start.DangerousGetHandle() + elementIndex * sizeof(T)).ToPointer(), default, this);
-        }
+            private void ThrowIfDisposed()
+            {
+                if (_disposed)
+                    ThrowHelper.ThrowObjectDisposedException("Object disposed");
+            }
 
-        public override void Unpin()
-        {
-            ThrowDisposed();
+            public override Span<T> GetSpan()
+            {
+                return new Span<T>((void*)(_block.DangerousGetHandle() + _start), _length);
+            }
 
-            if (_pinCount < 1)
-                throw new InvalidOperationException("Object was not pinned");
+            public override MemoryHandle Pin(int elementIndex = 0)
+            {
+                var success = false;
+                do
+                {
+                    _block.DangerousAddRef(ref success);
+                } while (!success);
 
-            _start.DangerousRelease();
-            Interlocked.Decrement(ref _pinCount);
+                return new MemoryHandle(pointer: (void*)(_block.DangerousGetHandle() + elementIndex * sizeof(T)), pinnable: this);
+            }
+
+            public override void Unpin()
+            {
+                _block.DangerousRelease();
+            }
         }
     }
 }

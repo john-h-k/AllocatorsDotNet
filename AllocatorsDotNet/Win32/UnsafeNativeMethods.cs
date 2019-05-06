@@ -44,6 +44,10 @@ namespace AllocatorsDotNet.Win32
         [DllImport("kernel32", EntryPoint = "VirtualQuery", ExactSpelling = true, SetLastError = true)]
         public static extern IntPtr VirtualQuery(void* address, MemInfo* pMemInfo, IntPtr size);
 
+        [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
+        [DllImport("kernel32", EntryPoint = "VirtualQuery", ExactSpelling = true, SetLastError = true)]
+        public static extern IntPtr VirtualQuery(IntPtr address, MemInfo* pMemInfo, IntPtr size);
+
         // For consistency in naming and location
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
         public static int GetLastError() => Marshal.GetLastWin32Error();
@@ -71,34 +75,20 @@ namespace AllocatorsDotNet.Win32
         }
 
 
-        private static readonly int PageSize = Environment.SystemPageSize;
-        public static SafeMemoryHandle Alloc(AllocFlags flags, IntPtr size)
-        {
-            // need to VirtualAlloc() an entire page with the permissions
-            NativeEnums.ProtectionTypes protectionFlags = flags.TranslateToWin32();
-            var handle = new SafePageHandle(
-                (void*)UnsafeNativeMethods.VirtualAlloc(
-                    IntPtr.Zero,
-                    (IntPtr)PageSize,
-                    NativeEnums.MemAllocTypeFlags.MEM_COMMIT | NativeEnums.MemAllocTypeFlags.MEM_RESERVE,
-                    protectionFlags));
-
-            if (handle.IsInvalid)
-                throw new InvalidOperationException($"Allocation failed, with HRESULT {UnsafeNativeMethods.GetLastError():X8}");
-
-            return handle;
-        }
+        
     }
 
-    internal unsafe struct MemInfo
+    public unsafe struct MemInfo
     {
-        void* BaseAddress;
-        void* AllocationBase;
-        uint AllocationProtect;
-        IntPtr RegionSize;
-        uint State;
-        uint Protect;
-        uint Type;
+#pragma warning disable 649
+        public void* BaseAddress;
+        public void* AllocationBase;
+        public uint AllocationProtect;
+        public IntPtr RegionSize;
+        public uint State;
+        public uint Protect;
+        public uint Type;
+#pragma warning restore 649
     }
 
     internal static class NativeEnums

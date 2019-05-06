@@ -1,4 +1,8 @@
 ﻿using System;
+using System.ComponentModel.Design;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using AllocatorsDotNet.PAL;
 using AllocatorsDotNet.Win32;
 
 namespace AllocatorsDotNet
@@ -19,7 +23,7 @@ namespace AllocatorsDotNet
         internal const AllocFlags ReadWriteExe = AllocFlags.Read | AllocFlags.Write | AllocFlags.Execute;
         internal const AllocFlags ReadExe = AllocFlags.Read | AllocFlags.Execute;
 
-        public static NativeEnums.ProtectionTypes TranslateToWin32(this AllocFlags flags)
+        private static NativeEnums.ProtectionTypes TranslateToWin32(this AllocFlags flags)
         {
             switch (flags)
             {
@@ -41,17 +45,47 @@ namespace AllocatorsDotNet
                 // Exceptional cases
 
                 case AllocFlags.Write:
-                    ThrowHelper.ThrowArgEx("Cannot have write only memory");
+                    ThrowHelper.ThrowArgumentException("Cannot have write only memory");
                     break;
                 case AllocFlags.Write | AllocFlags.Execute:
-                    ThrowHelper.ThrowArgEx("Cannot have write + execute only memory");
+                    ThrowHelper.ThrowArgumentException("Cannot have write + execute only memory");
                     break;
                 default:
-                    ThrowHelper.ThrowArgEx("Unrecognised enum value");
+                    ThrowHelper.ThrowArgumentException("Unrecognised enum value");
                     break;
             }
 
             return default;
+        }
+
+        private static NativeEnums.ProtectionTypes TranslateToLinux(this AllocFlags flags)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static NativeEnums.ProtectionTypes TranslateToOsx(this AllocFlags flags)
+        {
+            throw new NotImplementedException();
+        }
+
+        public static NativeEnums.ProtectionTypes TranslateToNativeFlags(this AllocFlags flags)
+        {
+            switch (PalData.CurrentPlatform)
+            {
+                case OS.Windows:
+                    return flags.TranslateToWin32();
+                case OS.Linux:
+                    return flags.TranslateToLinux();
+                case OS.Osx:
+                    return flags.TranslateToOsx();
+                case OS.FreeBsd: // TODO support
+                    ThrowHelper.ThrowNotImplementedException();
+                    break;
+            }
+
+            ThrowHelper.ThrowPlatformNotSupportedException("Unrecognised platform");
+
+            return default; // unreachable
         }
     }
 }

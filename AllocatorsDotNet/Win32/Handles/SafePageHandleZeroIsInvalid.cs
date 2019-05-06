@@ -2,13 +2,13 @@
 
 namespace AllocatorsDotNet.Win32.Handles
 {
-    public unsafe class SafePageHandle : SafeMemoryHandle
+    public unsafe class SafePageBlockHandle : SafeHandleZeroIsInvalid
     {
-        public SafePageHandle(bool ownsHandle) : base(ownsHandle)
+        public SafePageBlockHandle(bool ownsHandle) : base(ownsHandle)
         {
         }
 
-        public SafePageHandle(void* pointer, bool ownsHandle = true) : base(pointer, ownsHandle)
+        public SafePageBlockHandle(void* pointer, bool ownsHandle = true) : base(pointer, ownsHandle)
         {
         }
 

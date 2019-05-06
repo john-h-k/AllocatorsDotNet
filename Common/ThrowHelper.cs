@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 
 namespace AllocatorsDotNet
 {
@@ -7,6 +6,7 @@ namespace AllocatorsDotNet
     {
         public static void GenericThrow(Exception e)
             => throw e;
+
         public static void ThrowIfNull(object obj, string paramName = null)
         {
             if (obj is null)
@@ -24,11 +24,6 @@ namespace AllocatorsDotNet
 
         public static void ThrowInsufficientMemoryException(string message = null, Exception inner = null)
             => throw new InsufficientMemoryException(message, inner);
-
-        public static void ThrowPlatformNotSupportedException(string message = null, Exception inner = null)
-        => throw new PlatformNotSupportedException(message, inner);
-
-        public static void ThrowNotImplementedException() => throw new NotImplementedException();
 
         #region ARG EXCEPTIONS
 
